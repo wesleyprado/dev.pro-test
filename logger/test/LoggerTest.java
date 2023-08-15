@@ -1,54 +1,70 @@
 package test;
 
-import org.junit.jupiter.api.Test;
-
+import org.junit.Assert;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import cucumber.api.java.en.Given;
+import cucumber.api.java.en.Then;
+import cucumber.api.java.en.When;
 
-public class LoggerTest {
+public class LoggingStepDefinitions {
 
-    private static final String LOG_FILE = "test.log";
+    private String logFileName;
+    private String message;
+    private String logLevel;
+    private String logContent;
 
-    @Test
-    void testLogMessage() {
-        String message = "Test log message";
-        String level = "DEBUG";
-
-        Logger.logMessage(LOG_FILE, message, level);
-
-        assertTrue(doesLogFileContainMessage(message));
+    @Given("^the application log file \"([^\"]*)\" exists$")
+    public void theApplicationLogFileExists(String fileName) {
+        this.logFileName = fileName;
     }
 
-    private boolean doesLogFileContainMessage(String expectedMessage) {
-        try (BufferedReader reader = new BufferedReader(new FileReader(LOG_FILE))) {
+    @Given("^the application log file \"([^\"]*)\" does not exist$")
+    public void theApplicationLogFileDoesNotExist(String fileName) {
+        this.logFileName = fileName;
+
+        // Delete the file if it already exists
+        File logFile = new File(logFileName);
+        if (logFile.exists()) {
+            logFile.delete();
+        }
+    }
+
+    @When("^a message \"([^\"]*)\" with level \"([^\"]*)\" is logged$")
+    public void aMessageWithLevelIsLogged(String message, String level) {
+        this.message = message;
+        this.logLevel = level;
+
+        logMessage(logFileName, message, logLevel);
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(logFileName))) {
+            StringBuilder content = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
-                if (line.contains(expectedMessage)) {
-                    return true;
-                }
+                content.append(line);
             }
+            logContent = content.toString();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return false;
     }
 
-    @Test
-    void testLogFormat() {
-        String message = "Format test";
-        String level = "INFO";
-
-        Logger.logMessage(LOG_FILE, message, level);
-
-        String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        String expectedLogEntry = "[" + timestamp + "] [" + level + "] " + message;
-
-        assertTrue(doesLogFileContainMessage(expectedLogEntry));
+    @Then("^the log file \"([^\"]*)\" should contain \"([^\"]*)\"$")
+    public void theLogFileShouldContain(String fileName, String expectedLogEntry) {
+        Assert.assertTrue(logContent.contains(expectedLogEntry));
     }
-}
+
+    @Then("^the system should display an error message$")
+    public void theSystemShouldDisplayAnErrorMessage() {
+        boolean errorOccurred = false;
+        try {
+            logMessage(logFileName, message, logLevel);
+        } catch (Exception e) {
+            errorOccurred = true;
+        }
+        Assert.assertTrue("Error should have occurred", errorOccurred);
+    }
